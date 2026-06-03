@@ -8,17 +8,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Colors, Fonts } from '../constants'
 
 // Cada etapa do onboarding
-type Etapa = 'renda' | 'fixos' | 'meta'
+type Etapa = 'bemvindo' | 'renda' | 'fixos' | 'meta'
 
 export default function OnboardingScreen({ onConcluir }: { onConcluir: () => void }) {
-  const [etapa, setEtapa] = useState<Etapa>('renda')
+  const [etapa, setEtapa] = useState<Etapa>('bemvindo')
   const [renda, setRenda] = useState('')
   const [ciclo, setCiclo] = useState<'mensal' | 'quinzenal' | 'semanal'>('mensal')
   const [gastosFixos, setGastosFixos] = useState('')
   const [meta, setMeta] = useState('')
   const [carregando, setCarregando] = useState(false)
 
+  // Progresso visual — só aparece nas etapas de pergunta
+  const progresso = etapa === 'renda' ? 1 : etapa === 'fixos' ? 2 : etapa === 'meta' ? 3 : 0
+
   async function salvarEAvancar() {
+    if (etapa === 'bemvindo') {
+      setEtapa('renda')
+      return
+    }
+
     if (etapa === 'renda') {
       if (!renda || parseFloat(renda) <= 0) return
       setEtapa('fixos')
@@ -53,12 +61,10 @@ export default function OnboardingScreen({ onConcluir }: { onConcluir: () => voi
   }
 
   function voltarEtapa() {
+    if (etapa === 'renda') setEtapa('bemvindo')
     if (etapa === 'fixos') setEtapa('renda')
     if (etapa === 'meta') setEtapa('fixos')
   }
-
-  // Progresso visual (1 de 3, 2 de 3, 3 de 3)
-  const progresso = etapa === 'renda' ? 1 : etapa === 'fixos' ? 2 : 3
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -70,18 +76,45 @@ export default function OnboardingScreen({ onConcluir }: { onConcluir: () => voi
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header com progresso */}
-          <View style={styles.header}>
-            <View style={styles.progressRow}>
-              {[1, 2, 3].map((n) => (
-                <View
-                  key={n}
-                  style={[styles.progressDot, n <= progresso && styles.progressDotActive]}
-                />
-              ))}
+          {/* Indicador de progresso — escondido na tela de boas-vindas */}
+          {etapa !== 'bemvindo' && (
+            <View style={styles.header}>
+              <View style={styles.progressRow}>
+                {[1, 2, 3].map((n) => (
+                  <View
+                    key={n}
+                    style={[styles.progressDot, n <= progresso && styles.progressDotActive]}
+                  />
+                ))}
+              </View>
+              <Text style={styles.progressLabel}>{progresso} de 3</Text>
             </View>
-            <Text style={styles.progressLabel}>{progresso} de 3</Text>
-          </View>
+          )}
+
+          {/* Etapa 0 — Boas-vindas */}
+          {etapa === 'bemvindo' && (
+            <View style={[styles.etapa, styles.bemvindo]}>
+              <Text style={styles.logoBig}>💰</Text>
+              <Text style={styles.logoNome}>ControleFin</Text>
+              <Text style={styles.bemvindoTitulo}>Bem-vindo!</Text>
+              <Text style={styles.bemvindoTexto}>
+                Vamos fazer uma configuração rápida para personalizar seu orçamento.
+                São apenas 3 perguntas e leva menos de 1 minuto. 🚀
+              </Text>
+              <View style={styles.features}>
+                {[
+                  { emoji: '📊', texto: 'Orçamento diário calculado automaticamente' },
+                  { emoji: '🗂', texto: 'Envelopes por categoria para controlar gastos' },
+                  { emoji: '🎯', texto: 'Meta em destaque para te manter motivado' },
+                ].map((f) => (
+                  <View key={f.texto} style={styles.featureItem}>
+                    <Text style={styles.featureEmoji}>{f.emoji}</Text>
+                    <Text style={styles.featureTexto}>{f.texto}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* Etapa 1 — Renda */}
           {etapa === 'renda' && (
@@ -186,9 +219,9 @@ export default function OnboardingScreen({ onConcluir }: { onConcluir: () => voi
             </View>
           )}
 
-          {/* Botões */}
+          {/* Botões de navegação */}
           <View style={styles.botoes}>
-            {etapa !== 'renda' && (
+            {etapa !== 'bemvindo' && (
               <TouchableOpacity style={styles.btnVoltar} onPress={voltarEtapa}>
                 <Text style={styles.btnVoltarText}>← Voltar</Text>
               </TouchableOpacity>
@@ -199,10 +232,15 @@ export default function OnboardingScreen({ onConcluir }: { onConcluir: () => voi
               disabled={carregando}
             >
               <Text style={styles.btnAvancarText}>
-                {etapa === 'meta' ? (carregando ? 'Salvando...' : 'Começar 🚀') : 'Continuar →'}
+                {etapa === 'bemvindo'
+                  ? 'Vamos lá! →'
+                  : etapa === 'meta'
+                  ? (carregando ? 'Salvando...' : 'Começar 🚀')
+                  : 'Continuar →'}
               </Text>
             </TouchableOpacity>
           </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -213,6 +251,7 @@ const styles = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: Colors.bg },
   scroll: { flexGrow: 1, padding: 24 },
 
+  // Header de progresso
   header: { alignItems: 'center', marginBottom: 40, marginTop: 8 },
   progressRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   progressDot: {
@@ -222,13 +261,17 @@ const styles = StyleSheet.create({
   progressDotActive: { backgroundColor: Colors.accent, width: 24 },
   progressLabel: { fontSize: Fonts.xs, color: Colors.muted },
 
+  // Etapas
   etapa: { flex: 1 },
   emoji: { fontSize: 48, marginBottom: 16 },
   titulo: { fontSize: Fonts.xxl, color: Colors.text, fontWeight: '800', marginBottom: 8 },
   subtitulo: { fontSize: Fonts.sm, color: Colors.muted, lineHeight: 20, marginBottom: 32 },
+  label: {
+    fontSize: Fonts.xs, color: Colors.muted,
+    letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10,
+  },
 
-  label: { fontSize: Fonts.xs, color: Colors.muted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
-
+  // Input de valor
   inputRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: Colors.surface, borderRadius: 14,
@@ -240,7 +283,6 @@ const styles = StyleSheet.create({
     flex: 1, fontSize: Fonts.xxl, color: Colors.text,
     fontWeight: '700', paddingVertical: 16,
   },
-
   inputTexto: {
     backgroundColor: Colors.surface, borderRadius: 14,
     borderWidth: 1, borderColor: Colors.border,
@@ -249,6 +291,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
+  // Ciclo de recebimento
   opcoes: { flexDirection: 'row', gap: 10, marginBottom: 24 },
   opcao: {
     flex: 1, paddingVertical: 12, borderRadius: 12,
@@ -259,6 +302,7 @@ const styles = StyleSheet.create({
   opcaoText: { fontSize: Fonts.sm, color: Colors.muted, fontWeight: '500' },
   opcaoTextAtiva: { color: Colors.accent, fontWeight: '700' },
 
+  // Sugestões de meta
   sugestoes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
   sugestao: {
     paddingVertical: 8, paddingHorizontal: 14, borderRadius: 100,
@@ -270,6 +314,32 @@ const styles = StyleSheet.create({
 
   dica: { fontSize: Fonts.sm, color: Colors.muted, fontStyle: 'italic', marginBottom: 24 },
 
+  // Tela de boas-vindas
+  bemvindo: { alignItems: 'center', paddingTop: 20 },
+  logoBig: { fontSize: 64, marginBottom: 8 },
+  logoNome: {
+    fontSize: Fonts.xxl, color: Colors.accent,
+    fontWeight: '800', letterSpacing: -0.5, marginBottom: 32,
+  },
+  bemvindoTitulo: {
+    fontSize: 28, color: Colors.text,
+    fontWeight: '800', marginBottom: 12,
+  },
+  bemvindoTexto: {
+    fontSize: Fonts.sm, color: Colors.muted,
+    textAlign: 'center', lineHeight: 22, marginBottom: 40,
+  },
+  features: { width: '100%', gap: 16 },
+  featureItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: Colors.surface, borderRadius: 14,
+    borderWidth: 1, borderColor: Colors.border,
+    padding: 16,
+  },
+  featureEmoji: { fontSize: 24 },
+  featureTexto: { flex: 1, fontSize: Fonts.sm, color: Colors.text, lineHeight: 20 },
+
+  // Botões
   botoes: { marginTop: 32, gap: 12 },
   btnAvancar: {
     backgroundColor: Colors.accent, borderRadius: 16,
