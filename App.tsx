@@ -3,31 +3,27 @@ import { NavigationContainer } from '@react-navigation/native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { View, ActivityIndicator } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { AuthProvider, useAuth } from './src/contexts/AuthContext'
 import TabNavigator from './src/navigation/TabNavigator'
 import OnboardingScreen from './src/screens/OnboardingScreen'
+import CadastroScreen from './src/screens/CadastroScreen'
+import LoginScreen from './src/screens/LoginScreen'
 import { Colors } from './src/constants'
 
-export default function App() {
-  const [carregando, setCarregando] = useState(true)
-  const [onboardingFeito, setOnboardingFeito] = useState(false)
+// Fluxo: Onboarding → Cadastro/Login → Dashboard
+type Tela = 'onboarding' | 'cadastro' | 'login' | 'app'
+
+function AppContent() {
+  const { usuario, carregando } = useAuth()
+  const [tela, setTela] = useState<Tela>('onboarding')
 
   useEffect(() => {
-    verificarOnboarding()
-  }, [])
-
-  async function verificarOnboarding() {
-    try {
-      const feito = await AsyncStorage.getItem('@controle_onboarding')
-      setOnboardingFeito(feito === 'true')
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setCarregando(false)
+    // Se já está logado vai direto pro app
+    if (!carregando && usuario) {
+      setTela('app')
     }
-  }
+  }, [carregando, usuario])
 
-  // Tela de loading enquanto verifica o AsyncStorage
   if (carregando) {
     return (
       <View style={{ flex: 1, backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -36,16 +32,52 @@ export default function App() {
     )
   }
 
+  // Já logado — vai direto pro app
+  if (usuario) {
+    return (
+      <NavigationContainer>
+        <TabNavigator />
+      </NavigationContainer>
+    )
+  }
+
+  // Fluxo de autenticação
+  if (tela === 'onboarding') {
+    return (
+      <OnboardingScreen
+        onConcluir={() => setTela('cadastro')}
+      />
+    )
+  }
+
+  if (tela === 'cadastro') {
+    return (
+      <CadastroScreen
+        onIrParaLogin={() => setTela('login')}
+        onCadastrado={() => setTela('app')}
+      />
+    )
+  }
+
+  if (tela === 'login') {
+    return (
+      <LoginScreen
+        onIrParaCadastro={() => setTela('cadastro')}
+        onLogado={() => setTela('app')}
+      />
+    )
+  }
+
+  return null
+}
+
+export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      {onboardingFeito ? (
-        <NavigationContainer>
-          <TabNavigator />
-        </NavigationContainer>
-      ) : (
-        <OnboardingScreen onConcluir={() => setOnboardingFeito(true)} />
-      )}
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </SafeAreaProvider>
   )
 }
