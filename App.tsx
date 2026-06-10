@@ -9,6 +9,7 @@ import OnboardingScreen from './src/screens/OnboardingScreen'
 import CadastroScreen from './src/screens/CadastroScreen'
 import LoginScreen from './src/screens/LoginScreen'
 import { Colors } from './src/constants'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 // Fluxo: Onboarding → Cadastro/Login → Dashboard
 type Tela = 'onboarding' | 'cadastro' | 'login' | 'app'
