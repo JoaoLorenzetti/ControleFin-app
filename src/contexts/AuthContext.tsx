@@ -82,13 +82,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function salvarPerfil(dados: DadosPerfil) {
-    const { data } = await api.post('/auth/perfil', dados)
+  // Pega o token diretamente do storage para garantir que está disponível
+  const tokenAtual = await AsyncStorage.getItem('@controle_token')
 
-    // Atualiza o usuário local marcando perfil como completo
-    const usuarioAtualizado = { ...usuario!, perfilCompleto: true }
-    await AsyncStorage.setItem('@controle_usuario', JSON.stringify(usuarioAtualizado))
-    setUsuario(usuarioAtualizado)
-  }
+  const { data } = await api.post('/auth/perfil', dados, {
+    headers: {
+      Authorization: `Bearer ${tokenAtual}`
+    }
+  })
+
+  // Atualiza o usuário local marcando perfil como completo
+  const usuarioAtualizado = { ...usuario!, perfilCompleto: true }
+  await AsyncStorage.setItem('@controle_usuario', JSON.stringify(usuarioAtualizado))
+  setUsuario(usuarioAtualizado)
+}
 
   async function logout() {
     await AsyncStorage.multiRemove(['@controle_token', '@controle_usuario', '@controle_onboarding'])
