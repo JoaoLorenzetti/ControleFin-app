@@ -9,17 +9,15 @@ import OnboardingScreen from './src/screens/OnboardingScreen'
 import CadastroScreen from './src/screens/CadastroScreen'
 import LoginScreen from './src/screens/LoginScreen'
 import { Colors } from './src/constants'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 
-// Fluxo: Onboarding → Cadastro/Login → Dashboard
-type Tela = 'onboarding' | 'cadastro' | 'login' | 'app'
+type Tela = 'onboarding' | 'onboarding-perfil' | 'cadastro' | 'login' | 'app'
 
 function AppContent() {
   const { usuario, carregando } = useAuth()
   const [tela, setTela] = useState<Tela>('onboarding')
+  const [tokenCadastro, setTokenCadastro] = useState<string | null>(null)
 
   useEffect(() => {
-    // Se já está logado vai direto pro app
     if (!carregando && usuario) {
       setTela('app')
     }
@@ -33,7 +31,6 @@ function AppContent() {
     )
   }
 
-  // Já logado — vai direto pro app
   if (usuario) {
     return (
       <NavigationContainer>
@@ -42,20 +39,28 @@ function AppContent() {
     )
   }
 
-  // Fluxo de autenticação
   if (tela === 'onboarding') {
-    return (
-      <OnboardingScreen
-        onConcluir={() => setTela('cadastro')}
-      />
-    )
+    return <OnboardingScreen onConcluir={() => setTela('cadastro')} />
   }
 
   if (tela === 'cadastro') {
     return (
       <CadastroScreen
         onIrParaLogin={() => setTela('login')}
-        onCadastrado={() => setTela('app')}
+        onCadastrado={(token) => {
+          setTokenCadastro(token)
+          setTela('onboarding-perfil')
+        }}
+      />
+    )
+  }
+
+  if (tela === 'onboarding-perfil') {
+    return (
+      <OnboardingScreen
+        onConcluir={() => setTela('app')}
+        // @ts-ignore: tokenOverride is used conditionally for onboarding flow
+        tokenOverride={tokenCadastro ?? undefined}
       />
     )
   }

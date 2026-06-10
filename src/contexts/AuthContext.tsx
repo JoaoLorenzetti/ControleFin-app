@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import api from '../services/api'
 
@@ -20,9 +21,9 @@ interface AuthContextType {
   usuario: Usuario | null
   token: string | null
   carregando: boolean
-  cadastrar: (nome: string, email: string, senha: string) => Promise<void>
+  cadastrar: (nome: string, email: string, senha: string) => Promise<string>
   login: (email: string, senha: string) => Promise<Usuario>
-  salvarPerfil: (dados: DadosPerfil) => Promise<void>
+  salvarPerfil: (dados: DadosPerfil, tokenOverride?: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -54,51 +55,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     carregarSessao()
   }, [])
 
-  async function cadastrar(nome: string, email: string, senha: string) {
+  async function cadastrar(nome: string, email: string, senha: string): Promise<string> {
     const { data } = await api.post('/auth/cadastrar', { nome, email, senha })
-    const { token, usuario } = data.dados
+    const { token: novoToken, usuario: novoUsuario } = data.dados
+
+    console.log('Token recebido no cadastro:', novoToken)
 
     await AsyncStorage.multiSet([
-      ['@controle_token', token],
-      ['@controle_usuario', JSON.stringify(usuario)],
+      ['@controle_token', novoToken],
+      ['@controle_usuario', JSON.stringify(novoUsuario)],
     ])
 
-    setToken(token)
-    setUsuario(usuario)
+    const tokenSalvo = await AsyncStorage.getItem('@controle_token')
+    console.log('Token salvo no AsyncStorage:', tokenSalvo)
+
+    setToken(novoToken)
+    setUsuario(novoUsuario)
+
+    return novoToken
   }
 
   async function login(email: string, senha: string): Promise<Usuario> {
     const { data } = await api.post('/auth/login', { email, senha })
-    const { token, usuario } = data.dados
+    const { token: novoToken, usuario: novoUsuario } = data.dados
 
     await AsyncStorage.multiSet([
-      ['@controle_token', token],
-      ['@controle_usuario', JSON.stringify(usuario)],
+      ['@controle_token', novoToken],
+      ['@controle_usuario', JSON.stringify(novoUsuario)],
     ])
 
-    setToken(token)
-    setUsuario(usuario)
-    return usuario
+    setToken(novoToken)
+    setUsuario(novoUsuario)
+    return novoUsuario
   }
 
-  async function salvarPerfil(dados: DadosPerfil) {
-  // Pega o token diretamente do storage para garantir que está disponível
-  const tokenAtual = await AsyncStorage.getItem('@controle_token')
+  async function salvarPerfil(dados: DadosPerfil, tokenOverride?: string): Promise<void> {
+    const tokenUsado = tokenOverride || await AsyncStorage.getItem('@controle_token')
+    console.log('Token usado no salvarPerfil:', tokenUsado)
 
-  const { data } = await api.post('/auth/perfil', dados, {
-    headers: {
-      Authorization: `Bearer ${tokenAtual}`
-    }
-  })
+    await api.post('/auth/perfil', dados, {
+      headers: { Authorization: `Bearer ${tokenUsado}` }
+    })
 
-  // Atualiza o usuário local marcando perfil como completo
-  const usuarioAtualizado = { ...usuario!, perfilCompleto: true }
-  await AsyncStorage.setItem('@controle_usuario', JSON.stringify(usuarioAtualizado))
-  setUsuario(usuarioAtualizado)
-}
+    const usuarioAtualizado = { ...usuario!, perfilCompleto: true }
+    await AsyncStorage.setItem('@controle_usuario', JSON.stringify(usuarioAtualizado))
+    setUsuario(usuarioAtualizado)
+  }
 
-  async function logout() {
-    await AsyncStorage.multiRemove(['@controle_token', '@controle_usuario', '@controle_onboarding'])
+  async function logout(): Promise<void> {
+    await AsyncStorage.multiRemove([
+      '@controle_token',
+      '@controle_usuario',
+      '@controle_onboarding',
+    ])
     setToken(null)
     setUsuario(null)
   }
