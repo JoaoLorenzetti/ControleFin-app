@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform, ScrollView
+  StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Colors, Fonts } from '../constants'
+import { useAuth } from '../contexts/AuthContext'
+
 
 // Cada etapa do onboarding
 type Etapa = 'bemvindo' | 'renda' | 'fixos' | 'meta'
@@ -17,6 +19,7 @@ export default function OnboardingScreen({ onConcluir }: { onConcluir: () => voi
   const [gastosFixos, setGastosFixos] = useState('')
   const [meta, setMeta] = useState('')
   const [carregando, setCarregando] = useState(false)
+  const { salvarPerfil } = useAuth()
 
   // Progresso visual — só aparece nas etapas de pergunta
   const progresso = etapa === 'renda' ? 1 : etapa === 'fixos' ? 2 : etapa === 'meta' ? 3 : 0
@@ -40,24 +43,26 @@ export default function OnboardingScreen({ onConcluir }: { onConcluir: () => voi
 
     // Etapa final — salva tudo e conclui
     if (etapa === 'meta') {
-      setCarregando(true)
-      try {
-        const perfil = {
-          renda: parseFloat(renda),
-          ciclo,
-          gastosFixos: parseFloat(gastosFixos) || 0,
-          meta: meta || 'Reserva de emergência',
-          criadoEm: new Date().toISOString(),
-        }
-        await AsyncStorage.setItem('@controle_perfil', JSON.stringify(perfil))
-        await AsyncStorage.setItem('@controle_onboarding', 'true')
-        onConcluir()
-      } catch (e) {
-        console.error('Erro ao salvar perfil:', e)
-      } finally {
-        setCarregando(false)
-      }
-    }
+  setCarregando(true)
+  try {
+    // Salva no backend via API
+    await salvarPerfil({
+      renda: parseFloat(renda),
+      ciclo,
+      gastosFixos: parseFloat(gastosFixos) || 0,
+      meta: meta || 'Reserva de emergência',
+    })
+
+    // Marca onboarding como feito localmente também
+    await AsyncStorage.setItem('@controle_onboarding', 'true')
+    onConcluir()
+  } catch (e) {
+    console.error('Erro ao salvar perfil:', e)
+    Alert.alert('Erro', 'Não foi possível salvar seu perfil. Tente novamente.')
+  } finally {
+    setCarregando(false)
+  }
+}
   }
 
   function voltarEtapa() {
