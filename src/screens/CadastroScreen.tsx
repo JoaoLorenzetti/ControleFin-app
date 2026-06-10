@@ -10,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 interface Props {
   onIrParaLogin: () => void
-  onCadastrado: () => void
+  onCadastrado: (token: string) => void // recebe o token
 }
 
 export default function CadastroScreen({ onIrParaLogin, onCadastrado }: Props) {
@@ -21,26 +21,26 @@ export default function CadastroScreen({ onIrParaLogin, onCadastrado }: Props) {
   const { cadastrar } = useAuth()
 
   async function handleCadastro() {
-    if (!nome || !email || !senha) {
-      Alert.alert('Atenção', 'Preencha todos os campos')
-      return
-    }
-    if (senha.length < 6) {
-      Alert.alert('Atenção', 'A senha deve ter pelo menos 6 caracteres')
-      return
-    }
-
-    setCarregando(true)
-    try {
-      await cadastrar(nome, email, senha)
-      onCadastrado()
-    } catch (error: any) {
-      const mensagem = error.response?.data?.message || 'Erro ao cadastrar. Tente novamente.'
-      Alert.alert('Erro', mensagem)
-    } finally {
-      setCarregando(false)
-    }
+  if (!nome || !email || !senha) {
+    Alert.alert('Atenção', 'Preencha todos os campos')
+    return
   }
+  if (senha.length < 6) {
+    Alert.alert('Atenção', 'A senha deve ter pelo menos 6 caracteres')
+    return
+  }
+
+  setCarregando(true)
+  try {
+    const token = await cadastrar(nome, email, senha)
+    onCadastrado(token) // passa o token para o App.tsx
+  } catch (error: any) {
+    const mensagem = error.response?.data?.message || 'Erro ao cadastrar. Tente novamente.'
+    Alert.alert('Erro', mensagem)
+  } finally {
+    setCarregando(false)
+  }
+}
 
   return (
     <SafeAreaView style={styles.safe}>
